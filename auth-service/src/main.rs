@@ -1,4 +1,5 @@
-use axum::{response::Html, routing::get, serve, Router};
+use axum::{Router, extract::Query, response::Html, routing::get, serve};
+use serde::Deserialize;
 use tower_http::services::ServeDir;
 
 #[tokio::main]
@@ -17,7 +18,28 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn hello_handler() -> Html<&'static str> {
-    // TODO: Update this to a custom message!
-    Html("<h1>Hello, World!</h1>")
+#[derive(Deserialize)]
+struct HelloQuery {
+    name: Option<String>,
+}
+
+async fn hello_handler(Query(query): Query<HelloQuery>) -> Html<String> {
+    let name = query.name.as_deref().unwrap_or("friend");
+    let name = escape_html(name);
+    Html(format!("<h1>Hello, {}!</h1>", name))
+}
+
+fn escape_html(input: &str) -> String {
+    let mut escaped = String::with_capacity(input.len());
+    for ch in input.chars() {
+        match ch {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#39;"),
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
 }
