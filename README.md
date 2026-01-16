@@ -1,6 +1,6 @@
 ## Setup & Building
 ```bash
-cargo install cargo-watch
+cargo install bacon
 cd app-service
 cargo build
 cd ..
@@ -13,7 +13,7 @@ cd ..
 #### App service
 ```bash
 cd app-service
-cargo watch -q -c -w src/ -w assets/ -w templates/ -x run
+bacon run
 ```
 
 visit http://localhost:8000
@@ -21,7 +21,7 @@ visit http://localhost:8000
 #### Auth service
 ```bash
 cd auth-service
-cargo watch -q -c -w src/ -w assets/ -x run
+bacon run
 ```
 
 visit http://localhost:3000
