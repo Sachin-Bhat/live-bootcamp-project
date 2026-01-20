@@ -1,9 +1,12 @@
 use std::error::Error;
 
 use axum::Router;
-use axum::{response::IntoResponse, routing::post, serve::Serve};
+use axum::{routing::post, serve::Serve};
 use tokio::net::TcpListener;
 use tower_http::services::{ServeDir, ServeFile};
+
+pub mod routes;
+use crate::routes::{login, logout, signup, verify_2fa, verify_token};
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
@@ -39,27 +42,4 @@ impl Application {
         println!("listening on {}", &self.address);
         self.server.await
     }
-}
-
-// Example route handler.
-// For now we will simply return a 201 (CREATED) status code.
-async fn signup() -> impl IntoResponse {
-    reqwest::StatusCode::CREATED.into_response()
-}
-
-// TODO: Add all other route handlers with appropriate status codes
-async fn login() -> impl IntoResponse {
-    reqwest::StatusCode::OK.into_response()
-}
-
-async fn logout() -> impl IntoResponse {
-    reqwest::StatusCode::OK.into_response()
-}
-
-async fn verify_2fa() -> impl IntoResponse {
-    reqwest::StatusCode::OK.into_response()
-}
-
-async fn verify_token() -> impl IntoResponse {
-    reqwest::StatusCode::OK.into_response()
 }
