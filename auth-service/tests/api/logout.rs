@@ -5,7 +5,7 @@ use crate::helpers::TestApp;
 async fn logout_returns_200() {
     let app = TestApp::new().await;
 
-    let response = app.logout("123456").await;
+    let response = app.post_logout("123456").await;
 
     assert_eq!(response.status().as_u16(), 200);
 }

@@ -6,7 +6,7 @@ async fn verify_2fa_returns_200() {
     let app = TestApp::new().await;
 
     let response = app
-        .verify_2fa("test.user@example.com", "123456", "123456")
+        .post_verify_2fa("test.user@example.com", "123456", "123456")
         .await;
 
     assert_eq!(response.status().as_u16(), 200);

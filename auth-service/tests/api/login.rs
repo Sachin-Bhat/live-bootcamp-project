@@ -5,7 +5,7 @@ use crate::helpers::TestApp;
 async fn login_returns_200() {
     let app = TestApp::new().await;
 
-    let response = app.login("test.user@example.com", "password123").await;
+    let response = app.post_login("test.user@example.com", "password123").await;
 
     assert_eq!(response.status().as_u16(), 200);
 }

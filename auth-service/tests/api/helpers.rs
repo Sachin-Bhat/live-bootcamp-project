@@ -1,4 +1,5 @@
 use auth_service::Application;
+use uuid::Uuid;
 
 pub struct TestApp {
     pub address: String,
@@ -36,25 +37,19 @@ impl TestApp {
     }
 
     // Implement helper functions for all other routes (signup, login, logout, verify-2fa, and verify-token)
-    pub async fn signup(
-        &self,
-        email: &str,
-        password: &str,
-        requires_2fa: bool,
-    ) -> reqwest::Response {
+    pub async fn post_signup<Body>(&self, body: &Body) -> reqwest::Response
+    where
+        Body: serde::Serialize,
+    {
         self.http_client
             .post(&format!("{}/signup", &self.address))
-            .json(&serde_json::json!({
-                "email": email,
-                "password": password,
-                "requires2FA": requires_2fa,
-            }))
+            .json(&serde_json::json!(body))
             .send()
             .await
             .expect("Failed to execute request.")
     }
 
-    pub async fn login(&self, email: &str, password: &str) -> reqwest::Response {
+    pub async fn post_login(&self, email: &str, password: &str) -> reqwest::Response {
         self.http_client
             .post(&format!("{}/login", &self.address))
             .json(&serde_json::json!({
@@ -66,7 +61,7 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn logout(&self, token: &str) -> reqwest::Response {
+    pub async fn post_logout(&self, token: &str) -> reqwest::Response {
         self.http_client
             .post(&format!("{}/logout", &self.address))
             .header("Cookie", format!("jwt={}", token))
@@ -75,7 +70,7 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn verify_2fa(
+    pub async fn post_verify_2fa(
         &self,
         email: &str,
         login_attempt_id: &str,
@@ -93,7 +88,7 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
-    pub async fn verify_token(&self, token: &str) -> reqwest::Response {
+    pub async fn post_verify_token(&self, token: &str) -> reqwest::Response {
         self.http_client
             .post(&format!("{}/verify-token", &self.address))
             .json(&serde_json::json!({
@@ -103,4 +98,8 @@ impl TestApp {
             .await
             .expect("Failed to execute request.")
     }
+}
+
+pub fn get_random_email() -> String {
+    format!("{}@example.com", Uuid::new_v4())
 }
