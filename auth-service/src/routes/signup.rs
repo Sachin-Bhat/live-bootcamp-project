@@ -1,10 +1,25 @@
-use axum::{http::StatusCode, response::IntoResponse, Json};
-use serde::Deserialize;
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use serde::{Deserialize, Serialize};
 
-// Example route handler.
-// For now we will simply return a 201 (CREATED) status code.
-pub async fn signup(Json(request): Json<SignupRequest>) -> impl IntoResponse {
-    StatusCode::CREATED.into_response()
+use crate::{app_state::AppState, domain::User};
+
+pub async fn signup(
+    State(state): State<AppState>,
+    Json(request): Json<SignupRequest>,
+) -> impl IntoResponse {
+    // Create a new `User` instance using data in the `request`
+    let user = User::new(request.email, request.password, request.requires_2fa);
+
+    let mut user_store = state.user_store.write().await;
+
+    // TODO: Add `user` to the `user_store`. Simply unwrap the returned `Result` enum type for now.
+    user_store.add_user(user).unwrap();
+
+    let response = Json(SignupResponse {
+        message: "User created successfully!".to_string(),
+    });
+
+    (StatusCode::CREATED, response)
 }
 
 #[derive(Deserialize)]
@@ -14,4 +29,9 @@ pub struct SignupRequest {
     // used to serialize/de-serialize a field with the given name instead of its Rust name.
     #[serde(rename = "requires2FA")]
     pub requires_2fa: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct SignupResponse {
+    pub message: String,
 }
