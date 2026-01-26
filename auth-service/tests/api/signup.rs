@@ -1,5 +1,6 @@
 use auth_service::{
     ErrorResponse,
+    domain::{Email, Password},
     routes::{SignupRequest, SignupResponse},
 };
 
@@ -34,11 +35,11 @@ async fn should_return_201_if_valid_input() {
 
     let random_email = get_random_email(); // Call helper method to generate email
 
-    let test_case = serde_json::json!({
-        "email": random_email,
-        "password": "password123",
-        "requires2FA": false
-    });
+    let test_case = SignupRequest {
+        email: Email::parse(&random_email).expect("valid email"),
+        password: Password::parse("Password123!").expect("valid password"),
+        requires_2fa: false,
+    };
 
     let response = app.post_signup(&test_case).await; // call `post_signup`
 
@@ -62,28 +63,28 @@ async fn should_return_201_if_valid_input() {
 async fn should_return_400_if_invalid_input() {
     // The signup route should return a 400 HTTP status code if an invalid input is sent.
     // The input is considered invalid if:
-    // - The email is empty or does not contain '@'
-    // - The password is less than 8 characters
+    // - The email is empty or does not contain '@' or '.'
+    // - The password does not meet the required complexity rules
 
     // Create an array of invalid inputs. Then, iterate through the array and
     // make HTTP calls to the signup route. Assert a 400 HTTP status code is returned.
     let app = TestApp::new().await;
     let input = vec![
-        SignupRequest {
-            email: "".to_owned(),
-            password: "password".to_owned(),
-            requires_2fa: false,
-        },
-        SignupRequest {
-            email: "email".to_owned(),
-            password: "password".to_owned(),
-            requires_2fa: false,
-        },
-        SignupRequest {
-            email: "email@example.com".to_owned(),
-            password: "pass".to_owned(),
-            requires_2fa: false,
-        },
+        serde_json::json!({
+            "email": "",
+            "password": "Password123!",
+            "requires2FA": false
+        }),
+        serde_json::json!({
+            "email": "email",
+            "password": "Password123!",
+            "requires2FA": false
+        }),
+        serde_json::json!({
+            "email": "email@example.com",
+            "password": "password123",
+            "requires2FA": false
+        }),
     ];
 
     for i in input.iter() {
@@ -108,8 +109,8 @@ async fn should_return_409_if_email_already_exists() {
 
     let response = app
         .post_signup(&SignupRequest {
-            email: "test@example.com".to_owned(),
-            password: "password123".to_owned(),
+            email: Email::parse("test@example.com").expect("valid email"),
+            password: Password::parse("Password123!").expect("valid password"),
             requires_2fa: false,
         })
         .await;
@@ -118,8 +119,8 @@ async fn should_return_409_if_email_already_exists() {
 
     let response = app
         .post_signup(&SignupRequest {
-            email: "test@example.com".to_owned(),
-            password: "password123".to_owned(),
+            email: Email::parse("test@example.com").expect("valid email"),
+            password: Password::parse("Password123!").expect("valid password"),
             requires_2fa: false,
         })
         .await;

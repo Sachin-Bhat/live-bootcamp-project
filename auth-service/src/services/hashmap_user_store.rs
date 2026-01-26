@@ -16,10 +16,10 @@ impl UserStore for HashmapUserStore {
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
         // Return `UserStoreError::UserAlreadyExists` if the user already exists,
         // otherwise insert the user into the hashmap and return `Ok(())`.
-        if self.users.contains_key(&user.email) {
+        if self.users.contains_key(user.email.as_ref()) {
             Err(UserStoreError::UserAlreadyExists)
         } else {
-            self.users.insert(user.email.clone(), user);
+            self.users.insert(user.email.as_ref().to_owned(), user);
             Ok(())
         }
     }
@@ -46,7 +46,7 @@ impl UserStore for HashmapUserStore {
     async fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
 
-        if user.password == password {
+        if user.password.as_ref() == password {
             Ok(())
         } else {
             Err(UserStoreError::InvalidCredentials)
@@ -58,13 +58,14 @@ impl UserStore for HashmapUserStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::{Email, Password};
 
     #[tokio::test]
     async fn test_add_user() {
         let mut store = HashmapUserStore::default();
         let user = User::new(
-            "test@example.com".to_string(),
-            "password123".to_string(),
+            Email::parse("test@example.com").expect("valid email"),
+            Password::parse("Password123!").expect("valid password"),
             false,
         );
 
@@ -79,16 +80,16 @@ mod tests {
     async fn test_get_user() {
         let mut store = HashmapUserStore::default();
         let user = User::new(
-            "test@example.com".to_string(),
-            "password123".to_string(),
+            Email::parse("test@example.com").expect("valid email"),
+            Password::parse("Password123!").expect("valid password"),
             false,
         );
 
         store.add_user(user).await.unwrap();
 
         let found = store.get_user("test@example.com").await.unwrap();
-        assert_eq!(found.email, "test@example.com");
-        assert_eq!(found.password, "password123");
+        assert_eq!(found.email.as_ref(), "test@example.com");
+        assert_eq!(found.password.as_ref(), "Password123!");
         assert!(matches!(
             store.get_user("missing@example.com").await,
             Err(UserStoreError::UserNotFound)
@@ -99,15 +100,17 @@ mod tests {
     async fn test_validate_user() {
         let mut store = HashmapUserStore::default();
         let user = User::new(
-            "test@example.com".to_string(),
-            "password123".to_string(),
+            Email::parse("test@example.com").expect("valid email"),
+            Password::parse("Password123!").expect("valid password"),
             false,
         );
 
         store.add_user(user).await.unwrap();
 
         assert_eq!(
-            store.validate_user("test@example.com", "password123").await,
+            store
+                .validate_user("test@example.com", "Password123!")
+                .await,
             Ok(())
         );
         assert_eq!(
