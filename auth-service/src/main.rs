@@ -9,7 +9,7 @@ async fn main() {
     // This is needed for Docker to work, which we will add later on.
     // See: https://stackoverflow.com/questions/39525820/docker-port-forwarding-not-working
 
-    let user_store = HashmapUserStore::new();
+    let user_store = HashmapUserStore::default();
     let app_state = AppState::new(Arc::new(RwLock::new(user_store)));
 
     let app = Application::build(app_state, "0.0.0.0:3000")
