@@ -1,11 +1,89 @@
-use crate::helpers::TestApp;
+use auth_service::ErrorResponse;
 
-// For now, simply assert that each route returns a 200 HTTP status code.
+use crate::helpers::{TestApp, get_random_email};
+
 #[tokio::test]
-async fn login_returns_200() {
+async fn should_return_422_if_malformed_credentials() {
     let app = TestApp::new().await;
 
-    let response = app.post_login("test.user@example.com", "password123").await;
+    let _random_email = get_random_email(); // Call helper method to generate email
 
-    assert_eq!(response.status().as_u16(), 200);
+    // add more malformed input test cases
+    let test_cases = [serde_json::json!({
+        "password": "password123"
+    })];
+
+    for test_case in test_cases.iter() {
+        let response = app.post_login(test_case).await; // call `post_signup`
+        assert_eq!(
+            response.status().as_u16(),
+            422,
+            "Failed for input: {:?}",
+            test_case
+        );
+    }
+}
+
+#[tokio::test]
+async fn should_return_400_if_invalid_input() {
+    let app = TestApp::new().await;
+    let email = get_random_email();
+    let password = "password123";
+
+    // Test with invalid email format
+    let invalid_email_payload = serde_json::json!({
+        "email": "not-an-email",
+        "password": password
+    });
+
+    let response = app.post_login(&invalid_email_payload).await;
+    assert_eq!(
+        response.status().as_u16(),
+        400,
+        "Expected 400 for invalid email format"
+    );
+
+    // Test with missing password
+    let missing_password_payload = serde_json::json!({
+        "email": email
+    });
+
+    let response = app.post_login(&missing_password_payload).await;
+    assert_eq!(
+        response.status().as_u16(),
+        400,
+        "Expected 400 for missing password"
+    );
+}
+
+#[tokio::test]
+async fn should_return_401_if_incorrect_credentials() {
+    let app = TestApp::new().await;
+    let email = get_random_email();
+    let password = "password123";
+    let wrong_password = "wrong_password";
+
+    // First, register a user to ensure the email exists in the database
+    let signup_payload = serde_json::json!({
+        "email": email,
+        "password": password
+    });
+    app.post_signup(&signup_payload).await;
+
+    // Attempt login with correct email but wrong password
+    let login_payload = serde_json::json!({
+        "email": email,
+        "password": wrong_password
+    });
+
+    let response = app.post_login(&login_payload).await;
+    assert_eq!(
+        response.status().as_u16(),
+        401,
+        "Expected 401 for incorrect credentials"
+    );
+
+    // Optionally verify error message contains expected content
+    let error_response: ErrorResponse = response.json().await.unwrap();
+    assert!(error_response.error.contains("Incorrect credentials"));
 }
