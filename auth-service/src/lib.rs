@@ -12,6 +12,7 @@ pub mod app_state;
 pub mod domain;
 pub mod routes;
 pub mod services;
+pub mod utils;
 use crate::domain::AuthAPIError;
 use crate::routes::{login, logout, signup, verify_2fa, verify_token};
 use app_state::AppState;

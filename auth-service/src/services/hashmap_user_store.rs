@@ -64,7 +64,7 @@ mod tests {
     async fn test_add_user() {
         let mut store = HashmapUserStore::default();
         let user = User::new(
-            Email::parse("test@example.com").expect("valid email"),
+            Email::parse("test@example.com".to_owned()).expect("valid email"),
             Password::parse("Password123!").expect("valid password"),
             false,
         );
@@ -80,7 +80,7 @@ mod tests {
     async fn test_get_user() {
         let mut store = HashmapUserStore::default();
         let user = User::new(
-            Email::parse("test@example.com").expect("valid email"),
+            Email::parse("test@example.com".to_owned()).expect("valid email"),
             Password::parse("Password123!").expect("valid password"),
             false,
         );
@@ -100,7 +100,7 @@ mod tests {
     async fn test_validate_user() {
         let mut store = HashmapUserStore::default();
         let user = User::new(
-            Email::parse("test@example.com").expect("valid email"),
+            Email::parse("test@example.com".to_owned()).expect("valid email"),
             Password::parse("Password123!").expect("valid password"),
             false,
         );

@@ -8,12 +8,19 @@ edition = "2024"
 [dependencies]
 async-trait = "0.1.89"
 axum = "0.8"
+axum-extra = { version = "0.12", features = ["cookie"] }
+chrono = "0.4.44"
+dotenvy = "0.15.7"
+jsonwebtoken = { version = "10.3.0", default-features = false, features = [
+    "rust_crypto",
+] }
+lazy_static = "1.5.0"
 reqwest = { version = "0.13", default-features = false, features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.149"
-tokio = { version = "1.49", features = ["full"] }
+tokio = { version = "1.50", features = ["full"] }
 tower-http = { version = "0.6", features = ["fs"] }
-uuid = { version = "1.21", features = ["v4", "serde"] }
+uuid = { version = "1.22", features = ["v4", "serde"] }
 validator = "0.20.0"
 
 [dev-dependencies]
@@ -21,4 +28,7 @@ fake = "4.4.0"
 quickcheck = "1.1"
 quickcheck_macros = "1.2"
 rand = "0.10"
-reqwest = { version = "0.13", default-features = false, features = ["json"] }
+reqwest = { version = "0.13", default-features = false, features = [
+    "json",
+    "cookies",
+] }
