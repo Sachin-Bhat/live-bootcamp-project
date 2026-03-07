@@ -26,9 +26,9 @@ impl AsRef<str> for Password {
 }
 
 impl Email {
-    pub fn parse(email: &str) -> Result<Self, EmailError> {
+    pub fn parse(email: String) -> Result<Self, EmailError> {
         if email.contains('@') && email.contains('.') && !email.is_empty() {
-            Ok(Email(email.to_owned()))
+            Ok(Email(email))
         } else {
             Err(EmailError::InvalidEmail)
         }
@@ -40,7 +40,7 @@ impl Password {
         if password.len() >= 8
             && password.chars().any(|c| c.is_uppercase())
             && password.chars().any(|c| c.is_lowercase())
-            && password.chars().any(|c| c.is_digit(10))
+            && password.chars().any(|c| c.is_ascii_digit())
             && password.chars().any(|c| !c.is_alphanumeric() && c != ' ')
         {
             Ok(Password(password.to_owned()))
@@ -57,19 +57,19 @@ mod tests {
 
     #[test]
     fn test_parse_valid_email() {
-        let email = Email::parse("test@example.com");
+        let email = Email::parse("test@example.com".to_owned());
         assert!(email.is_ok());
     }
 
     #[test]
     fn test_parse_invalid_email() {
-        let email = Email::parse("invalid_email");
+        let email = Email::parse("invalid_email".to_owned());
         assert!(email.is_err());
     }
 
     #[test]
     fn test_as_ref_returns_inner_str() {
-        let email = Email::parse("test@example.com").expect("Expected valid email");
+        let email = Email::parse("test@example.com".to_owned()).expect("Expected valid email");
         assert_eq!(email.as_ref(), "test@example.com");
     }
 

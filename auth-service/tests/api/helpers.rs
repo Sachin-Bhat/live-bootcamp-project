@@ -36,7 +36,7 @@ impl TestApp {
 
     pub async fn get_root(&self) -> reqwest::Response {
         self.http_client
-            .get(&format!("{}/", &self.address))
+            .get(format!("{}/", &self.address))
             .send()
             .await
             .expect("Failed to execute request.")
@@ -48,7 +48,7 @@ impl TestApp {
         Body: serde::Serialize,
     {
         self.http_client
-            .post(&format!("{}/signup", &self.address))
+            .post(format!("{}/signup", &self.address))
             .json(&serde_json::json!(body))
             .send()
             .await
@@ -60,7 +60,7 @@ impl TestApp {
         Body: serde::Serialize,
     {
         self.http_client
-            .post(&format!("{}/login", &self.address))
+            .post(format!("{}/login", &self.address))
             .json(body)
             .send()
             .await
@@ -69,7 +69,7 @@ impl TestApp {
 
     pub async fn post_logout(&self, token: &str) -> reqwest::Response {
         self.http_client
-            .post(&format!("{}/logout", &self.address))
+            .post(format!("{}/logout", &self.address))
             .header("Cookie", format!("jwt={}", token))
             .send()
             .await
@@ -83,7 +83,7 @@ impl TestApp {
         two_fa_code: &str,
     ) -> reqwest::Response {
         self.http_client
-            .post(&format!("{}/verify-2fa", &self.address))
+            .post(format!("{}/verify-2fa", &self.address))
             .json(&serde_json::json!({
                 "email": email,
                 "loginAttemptId": login_attempt_id,
@@ -96,7 +96,7 @@ impl TestApp {
 
     pub async fn post_verify_token(&self, token: &str) -> reqwest::Response {
         self.http_client
-            .post(&format!("{}/verify-token", &self.address))
+            .post(format!("{}/verify-token", &self.address))
             .json(&serde_json::json!({
                 "token": token,
             }))

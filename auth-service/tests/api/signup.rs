@@ -36,7 +36,7 @@ async fn should_return_201_if_valid_input() {
     let random_email = get_random_email(); // Call helper method to generate email
 
     let test_case = SignupRequest {
-        email: Email::parse(&random_email).expect("valid email"),
+        email: Email::parse(random_email).expect("valid email"),
         password: Password::parse("Password123!").expect("valid password"),
         requires_2fa: false,
     };
@@ -69,7 +69,7 @@ async fn should_return_400_if_invalid_input() {
     // Create an array of invalid inputs. Then, iterate through the array and
     // make HTTP calls to the signup route. Assert a 400 HTTP status code is returned.
     let app = TestApp::new().await;
-    let input = vec![
+    let input = [
         serde_json::json!({
             "email": "",
             "password": "Password123!",
@@ -109,7 +109,7 @@ async fn should_return_409_if_email_already_exists() {
 
     let response = app
         .post_signup(&SignupRequest {
-            email: Email::parse("test@example.com").expect("valid email"),
+            email: Email::parse("test@example.com".to_owned()).expect("valid email"),
             password: Password::parse("Password123!").expect("valid password"),
             requires_2fa: false,
         })
@@ -119,7 +119,7 @@ async fn should_return_409_if_email_already_exists() {
 
     let response = app
         .post_signup(&SignupRequest {
-            email: Email::parse("test@example.com").expect("valid email"),
+            email: Email::parse("test@example.com".to_owned()).expect("valid email"),
             password: Password::parse("Password123!").expect("valid password"),
             requires_2fa: false,
         })

@@ -16,7 +16,8 @@ pub async fn signup(
         requires_2fa,
     } = request;
 
-    let email = Email::parse(email.as_ref()).map_err(|_| AuthAPIError::InvalidCredentials)?;
+    let email =
+        Email::parse(email.as_ref().to_owned()).map_err(|_| AuthAPIError::InvalidCredentials)?;
     let password =
         Password::parse(password.as_ref()).map_err(|_| AuthAPIError::InvalidCredentials)?;
 
