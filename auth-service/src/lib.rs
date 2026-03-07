@@ -1,12 +1,20 @@
 use std::error::Error;
 
-use axum::response::{IntoResponse, Response};
-use axum::{Json, Router};
-use axum::{routing::post, serve::Serve};
+use axum::{
+    Json, Router,
+    http::{HeaderValue, Method},
+    response::{IntoResponse, Response},
+    routing::post,
+    serve::Serve,
+};
+use dotenvy::dotenv;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
-use tower_http::services::{ServeDir, ServeFile};
+use tower_http::{
+    cors::CorsLayer,
+    services::{ServeDir, ServeFile},
+};
 
 pub mod app_state;
 pub mod domain;
@@ -27,6 +35,22 @@ pub struct Application {
 
 impl Application {
     pub async fn build(app_state: AppState, address: &str) -> Result<Self, Box<dyn Error>> {
+        dotenv().ok();
+
+        // Allow app-service from local/dev and optional deployed origin.
+        let mut allowed_origins: Vec<HeaderValue> = vec!["http://localhost:8000".parse()?];
+        if let Ok(droplet_ip) = std::env::var("DROPLET_IP")
+            && !droplet_ip.is_empty()
+        {
+            let droplet_origin = format!("http://{droplet_ip}:8000");
+            allowed_origins.push(droplet_origin.parse()?);
+        }
+
+        let cors = CorsLayer::new()
+            .allow_methods([Method::GET, Method::POST])
+            .allow_credentials(true)
+            .allow_origin(allowed_origins);
+
         let assets_dir =
             ServeDir::new("assets").not_found_service(ServeFile::new("assets/index.html"));
         let router = Router::new()
@@ -36,7 +60,8 @@ impl Application {
             .route("/verify-token", post(verify_token))
             .route("/login", post(login))
             .route("/logout", post(logout))
-            .with_state(app_state);
+            .with_state(app_state)
+            .layer(cors);
         let listener = tokio::net::TcpListener::bind(address).await?;
         let address = listener.local_addr()?.to_string();
         let server = axum::serve(listener, router);
@@ -67,6 +92,8 @@ impl IntoResponse for AuthAPIError {
             AuthAPIError::UnexpectedError => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
             }
+            AuthAPIError::MissingToken => (StatusCode::BAD_REQUEST, "Missing token"),
+            AuthAPIError::InvalidToken => (StatusCode::UNAUTHORIZED, "Invalid token"),
         };
         let body = Json(ErrorResponse {
             error: error_message.to_string(),
