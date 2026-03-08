@@ -3,7 +3,7 @@ use chrono::Utc;
 use jsonwebtoken::{DecodingKey, EncodingKey, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::Email;
+use crate::domain::{BannedTokenStore, BannedTokenStoreError, Email};
 
 use super::constants::{JWT_COOKIE_NAME, JWT_SECRET};
 
@@ -26,6 +26,13 @@ fn create_auth_cookie(token: String) -> Cookie<'static> {
 pub enum GenerateTokenError {
     TokenError(jsonwebtoken::errors::Error),
     UnexpectedError,
+}
+
+#[derive(Debug)]
+pub enum ValidateTokenError {
+    TokenError(jsonwebtoken::errors::Error),
+    BannedToken,
+    StoreError(BannedTokenStoreError),
 }
 
 // This value determines how long the JWT auth token is valid for
@@ -55,13 +62,25 @@ fn generate_auth_token(email: &Email) -> Result<String, GenerateTokenError> {
 }
 
 // Check if JWT auth token is valid by decoding it using the JWT secret
-pub async fn validate_token(token: &str) -> Result<Claims, jsonwebtoken::errors::Error> {
+pub async fn validate_token(
+    token: &str,
+    banned_token_store: &(dyn BannedTokenStore + Send + Sync),
+) -> Result<Claims, ValidateTokenError> {
+    if banned_token_store
+        .contains_token(token)
+        .await
+        .map_err(ValidateTokenError::StoreError)?
+    {
+        return Err(ValidateTokenError::BannedToken);
+    }
+
     decode::<Claims>(
         token,
         &DecodingKey::from_secret(JWT_SECRET.as_bytes()),
         &Validation::default(),
     )
     .map(|data| data.claims)
+    .map_err(ValidateTokenError::TokenError)
 }
 
 // Create JWT auth token by encoding claims using the JWT secret
@@ -82,6 +101,7 @@ pub struct Claims {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::hashset_banned_token_store::HashsetBannedTokenStore;
 
     #[tokio::test]
     async fn test_generate_auth_cookie() {
@@ -116,7 +136,8 @@ mod tests {
     async fn test_validate_token_with_valid_token() {
         let email = Email::parse("test@example.com".to_owned()).unwrap();
         let token = generate_auth_token(&email).unwrap();
-        let result = validate_token(&token).await.unwrap();
+        let banned_token_store = HashsetBannedTokenStore::default();
+        let result = validate_token(&token, &banned_token_store).await.unwrap();
         assert_eq!(result.sub, "test@example.com");
 
         let exp = Utc::now()
@@ -130,7 +151,19 @@ mod tests {
     #[tokio::test]
     async fn test_validate_token_with_invalid_token() {
         let token = "invalid_token".to_owned();
-        let result = validate_token(&token).await;
+        let banned_token_store = HashsetBannedTokenStore::default();
+        let result = validate_token(&token, &banned_token_store).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_validate_token_with_banned_token() {
+        let email = Email::parse("test@example.com".to_owned()).unwrap();
+        let token = generate_auth_token(&email).unwrap();
+        let mut banned_token_store = HashsetBannedTokenStore::default();
+        banned_token_store.add_token(token.clone()).await.unwrap();
+
+        let result = validate_token(&token, &banned_token_store).await;
+        assert!(matches!(result, Err(ValidateTokenError::BannedToken)));
     }
 }
