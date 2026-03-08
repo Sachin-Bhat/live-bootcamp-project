@@ -1,7 +1,11 @@
 use std::sync::Arc;
 
 use auth_service::{
-    Application, app_state::AppState, services::hashmap_user_store::HashmapUserStore,
+    Application,
+    app_state::AppState,
+    services::{
+        hashmap_user_store::HashmapUserStore, hashset_banned_token_store::HashsetBannedTokenStore,
+    },
     utils::constants::prod,
 };
 use tokio::sync::RwLock;
@@ -13,7 +17,11 @@ async fn main() {
     // See: https://stackoverflow.com/questions/39525820/docker-port-forwarding-not-working
 
     let user_store = HashmapUserStore::default();
-    let app_state = AppState::new(Arc::new(RwLock::new(user_store)));
+    let banned_token_store = HashsetBannedTokenStore::default();
+    let app_state = AppState::new(
+        Arc::new(RwLock::new(user_store)),
+        Arc::new(RwLock::new(Box::new(banned_token_store))),
+    );
 
     let app = Application::build(app_state, prod::APP_ADDRESS)
         .await

@@ -9,10 +9,21 @@ pub trait UserStore {
     async fn validate_user(&self, email: &str, password: &str) -> Result<(), UserStoreError>;
 }
 
+#[async_trait::async_trait]
+pub trait BannedTokenStore {
+    async fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError>;
+    async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
+}
+
 #[derive(Debug, PartialEq)]
 pub enum UserStoreError {
     UserAlreadyExists,
     UserNotFound,
     InvalidCredentials,
+    UnexpectedError,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BannedTokenStoreError {
     UnexpectedError,
 }

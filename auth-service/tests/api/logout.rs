@@ -80,6 +80,13 @@ async fn should_return_200_if_valid_jwt_cookie() {
         .expect("set-cookie should be valid UTF-8");
     assert!(set_cookie_header.contains(&format!("{JWT_COOKIE_NAME}=")));
     assert!(set_cookie_header.contains("Max-Age=0"));
+
+    let banned_token_store = app.banned_token_store.read().await;
+    assert_eq!(
+        banned_token_store.contains_token(&token).await,
+        Ok(true),
+        "token should be added to banned token store after logout"
+    );
 }
 
 #[tokio::test]
