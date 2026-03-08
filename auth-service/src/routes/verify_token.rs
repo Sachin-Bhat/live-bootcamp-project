@@ -1,7 +1,24 @@
-use axum::response::IntoResponse;
+use axum::{Json, http::StatusCode, response::IntoResponse};
+use serde::Deserialize;
 
-// Example route handler.
-// For now we will simply return a 200 (OK) status code.
-pub async fn verify_token() -> impl IntoResponse {
-    reqwest::StatusCode::OK.into_response()
+use crate::{domain::AuthAPIError, utils::auth::validate_token};
+
+pub async fn verify_token(
+    Json(request): Json<VerifyTokenRequest>,
+) -> Result<impl IntoResponse, AuthAPIError> {
+    let token = request.token.trim();
+    if token.is_empty() {
+        return Err(AuthAPIError::InvalidCredentials);
+    }
+
+    validate_token(token)
+        .await
+        .map_err(|_| AuthAPIError::InvalidToken)?;
+
+    Ok(StatusCode::OK)
+}
+
+#[derive(Deserialize, Debug)]
+pub struct VerifyTokenRequest {
+    pub token: String,
 }

@@ -1,8 +1,8 @@
 # Start with image that has the Rust toolchain installed
-FROM rust:1.88-alpine AS chef
+FROM rust:alpine AS chef
 USER root
 # Add cargo-chef to cache dependencies
-RUN apk add --no-cache musl-dev & cargo install cargo-chef
+RUN apk add --no-cache musl-dev && cargo install cargo-chef
 WORKDIR /app
 
 FROM chef AS planner
@@ -20,7 +20,7 @@ RUN cargo build --release --bin auth-service
 
 # We do not need the Rust toolchain to run the binary!
 # Start with a minimal image and copy over the binary and assets folder.
-FROM debian:bookworm-slim AS runtime
+FROM debian:stable-slim AS runtime
 WORKDIR /app
 COPY --from=builder /app/target/release/auth-service /usr/local/bin
 COPY --from=builder /app/assets /app/assets
