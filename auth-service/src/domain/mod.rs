@@ -1,8 +1,10 @@
 mod data_stores;
+pub mod email_client;
 mod error;
 mod user;
 
 pub use data_stores::*;
+pub use email_client::*;
 pub use error::*;
 use serde::{Deserialize, Serialize};
 pub use user::*;

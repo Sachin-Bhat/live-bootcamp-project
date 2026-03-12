@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, Email, LoginAttemptId, Password, TwoFACode, UserStore, UserStoreError},
+    domain::{AuthAPIError, Email, LoginAttemptId, Password, TwoFACode, UserStoreError},
     utils::auth::generate_auth_cookie,
 };
 
@@ -66,7 +66,22 @@ async fn handle_2fa(
 
     let mut two_fa_code_store = state.two_fa_code_store.write().await;
     if two_fa_code_store
-        .add_code(email.clone(), login_attempt_id.clone(), two_fa_code)
+        .add_code(email.clone(), login_attempt_id.clone(), two_fa_code.clone())
+        .await
+        .is_err()
+    {
+        return (jar, Err(AuthAPIError::UnexpectedError));
+    }
+
+    let email_client = state.email_client.read().await;
+    let subject = "Your 2FA code";
+    let content = format!(
+        "Your code is {}. Login attempt ID: {}",
+        two_fa_code.as_ref(),
+        login_attempt_id.as_ref()
+    );
+    if email_client
+        .send_email(email, subject, &content)
         .await
         .is_err()
     {
