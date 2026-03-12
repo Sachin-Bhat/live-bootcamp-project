@@ -20,4 +20,8 @@ impl User {
             requires_2fa,
         }
     }
+
+    pub fn requires_2fa(&self) -> bool {
+        self.requires_2fa
+    }
 }
