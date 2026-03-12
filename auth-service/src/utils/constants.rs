@@ -9,10 +9,21 @@ lazy_static! {
 
 fn set_token() -> String {
     dotenv().ok(); // Load environment variables
-    let secret = std_env::var(env::JWT_SECRET_ENV_VAR).expect("JWT_SECRET must be set.");
-    if secret.is_empty() {
+    let secret = match std_env::var(env::JWT_SECRET_ENV_VAR) {
+        Ok(secret) => secret,
+        Err(err) => {
+            if cfg!(debug_assertions) {
+                "local-dev-jwt-secret".to_owned()
+            } else {
+                panic!("JWT_SECRET must be set.: {err}");
+            }
+        }
+    };
+
+    if secret.trim().is_empty() {
         panic!("JWT_SECRET must not be empty.");
     }
+
     secret
 }
 
