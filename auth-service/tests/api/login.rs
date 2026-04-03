@@ -130,7 +130,7 @@ async fn should_return_200_if_valid_credentials_and_2fa_disabled() {
 
 #[tokio::test]
 async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let random_email = get_random_email();
 
@@ -172,4 +172,7 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
         .await
         .expect("2FA code entry should exist");
     assert_eq!(stored_login_attempt_id.as_ref(), json_body.login_attempt_id);
+
+    drop(two_fa_code_store);
+    app.clean_up().await;
 }
