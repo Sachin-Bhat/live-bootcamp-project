@@ -1,19 +1,19 @@
 // The User struct should contain 3 fields. email, which is a String;
 // password, which is also a String; and requires_2fa, which is a boolean.
 
-use crate::domain::{Email, Password};
+use crate::domain::{Email, HashedPassword};
 use serde::Serialize;
 
 #[derive(Serialize, Clone)]
 pub struct User {
     pub(crate) email: Email,
-    pub(crate) password: Password,
+    pub(crate) password: HashedPassword,
     #[serde(rename = "requires2FA")]
-    requires_2fa: bool,
+    pub(crate) requires_2fa: bool,
 }
 
 impl User {
-    pub fn new(email: Email, password: Password, requires_2fa: bool) -> Self {
+    pub fn new(email: Email, password: HashedPassword, requires_2fa: bool) -> Self {
         User {
             email,
             password,

@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS banned_tokens (
+    token TEXT NOT NULL PRIMARY KEY,
+    expires_at TIMESTAMPTZ NOT NULL
+);

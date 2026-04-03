@@ -9,7 +9,7 @@ use crate::helpers::{TestApp, get_random_email};
 
 #[tokio::test]
 async fn should_return_422_if_malformed_input() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let valid_login_attempt_id = LoginAttemptId::default();
     let valid_email = get_random_email();
@@ -43,11 +43,13 @@ async fn should_return_422_if_malformed_input() {
             test_case
         );
     }
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_400_if_invalid_input() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let valid_login_attempt_id = LoginAttemptId::default();
     let valid_two_fa_code = TwoFACode::default();
@@ -82,11 +84,13 @@ async fn should_return_400_if_invalid_input() {
         let error_response: ErrorResponse = response.json().await.unwrap();
         assert!(error_response.error.contains("Invalid credentials"));
     }
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_incorrect_credentials() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let email = get_random_email();
     let password = "Password123!";
@@ -122,11 +126,13 @@ async fn should_return_401_if_incorrect_credentials() {
     assert_eq!(verify_response.status().as_u16(), 401);
     let body: ErrorResponse = verify_response.json().await.expect("valid error response");
     assert_eq!(body.error, "Incorrect credentials");
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_old_code() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let email = get_random_email();
     let password = "Password123!";
@@ -173,11 +179,13 @@ async fn should_return_401_if_old_code() {
     assert_eq!(verify_response.status().as_u16(), 401);
     let body: ErrorResponse = verify_response.json().await.expect("valid error response");
     assert_eq!(body.error, "Incorrect credentials");
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_200_if_correct_code() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let email = get_random_email();
     let password = "Password123!";
@@ -223,11 +231,13 @@ async fn should_return_200_if_correct_code() {
         .find(|cookie| cookie.name() == JWT_COOKIE_NAME)
         .expect("auth cookie should be set on successful 2FA verification");
     assert!(!auth_cookie.value().is_empty());
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_same_code_twice() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let email = get_random_email();
     let password = "Password123!";
@@ -276,4 +286,6 @@ async fn should_return_401_if_same_code_twice() {
         .await
         .expect("valid error response");
     assert_eq!(body.error, "Incorrect credentials");
+
+    app.clean_up().await;
 }

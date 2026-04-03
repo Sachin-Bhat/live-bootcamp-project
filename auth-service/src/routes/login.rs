@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, Email, LoginAttemptId, Password, TwoFACode, UserStoreError},
+    domain::{AuthAPIError, Email, LoginAttemptId, TwoFACode, UserStoreError},
     utils::auth::generate_auth_cookie,
 };
 
@@ -15,7 +15,7 @@ pub async fn login(
 ) -> (CookieJar, Result<impl IntoResponse, AuthAPIError>) {
     let LoginRequest { email, password } = request;
 
-    let email = match Email::parse(email.as_ref().to_owned()) {
+    let email = match Email::parse(email) {
         Ok(email) => email,
         Err(_) => return (jar, Err(AuthAPIError::InvalidCredentials)),
     };
@@ -26,7 +26,7 @@ pub async fn login(
 
     let user_store = state.user_store.read().await;
     if let Err(error) = user_store
-        .validate_user(email.as_ref(), password.as_ref())
+        .validate_user(email.as_ref(), &password)
         .await
     {
         let api_error = match error {
@@ -118,8 +118,8 @@ async fn handle_no_2fa(
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LoginRequest {
-    pub email: Email,
-    pub password: Option<Password>,
+    pub email: String,
+    pub password: Option<String>,
 }
 
 // The login route can return 2 possible success responses.

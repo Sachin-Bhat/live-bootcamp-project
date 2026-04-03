@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     app_state::AppState,
-    domain::{AuthAPIError, Email, Password, User},
+    domain::{AuthAPIError, Email, HashedPassword, User},
 };
 
 pub async fn signup(
@@ -17,21 +17,18 @@ pub async fn signup(
     } = request;
 
     let email =
-        Email::parse(email.as_ref().to_owned()).map_err(|_| AuthAPIError::InvalidCredentials)?;
+        Email::parse(email).map_err(|_| AuthAPIError::InvalidCredentials)?;
     let password =
-        Password::parse(password.as_ref()).map_err(|_| AuthAPIError::InvalidCredentials)?;
+        HashedPassword::parse(password).await.map_err(|_| AuthAPIError::InvalidCredentials)?;
 
     let mut user_store = state.user_store.write().await;
 
-    // early return AuthAPIError::UserAlreadyExists if email exists in user_store.
     if user_store.get_user(email.as_ref()).await.is_ok() {
         return Err(AuthAPIError::UserAlreadyExists);
     }
 
-    // Create a new `User` instance using data in the `request`
     let user = User::new(email, password, requires_2fa);
 
-    // instead of using unwrap, early return AuthAPIError::UnexpectedError if add_user() fails.
     user_store
         .add_user(user)
         .await
@@ -46,9 +43,8 @@ pub async fn signup(
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct SignupRequest {
-    pub email: Email,
-    pub password: Password,
-    // used to serialize/de-serialize a field with the given name instead of its Rust name.
+    pub email: String,
+    pub password: String,
     #[serde(rename = "requires2FA")]
     pub requires_2fa: bool,
 }

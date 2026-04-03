@@ -9,6 +9,8 @@ use axum::{
 };
 use dotenvy::dotenv;
 use reqwest::StatusCode;
+use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
 use tower_http::{
@@ -24,6 +26,10 @@ pub mod utils;
 use crate::domain::AuthAPIError;
 use crate::routes::{login, logout, signup, verify_2fa, verify_token};
 use app_state::AppState;
+
+pub async fn get_postgres_pool(url: &str) -> Result<PgPool, sqlx::Error> {
+    PgPoolOptions::new().max_connections(5).connect(url).await
+}
 
 // This struct encapsulates our application-related logic.
 pub struct Application {
