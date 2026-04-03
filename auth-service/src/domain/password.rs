@@ -87,10 +87,7 @@ mod tests {
         password_hash::{rand_core::OsRng, SaltString},
         Algorithm, Argon2, Params, PasswordHasher, Version,
     };
-    use fake::faker::internet::en::Password as FakePassword;
-    use fake::Fake;
     use quickcheck::Gen;
-    use rand::SeedableRng;
 
     #[tokio::test]
     async fn empty_string_is_rejected() {
@@ -153,16 +150,28 @@ mod tests {
 
     impl quickcheck::Arbitrary for ValidPasswordFixture {
         fn arbitrary(g: &mut Gen) -> Self {
-            let seed: u64 = g.size() as u64;
-            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
-            let password = FakePassword(8..30).fake_with_rng(&mut rng);
-            Self(password)
+            const UPPER: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            const LOWER: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
+            const DIGITS: &[u8] = b"0123456789";
+            const SPECIAL: &[u8] = b"!@#$%^&*";
+
+            let upper = *g.choose(UPPER).unwrap() as char;
+            let lower = *g.choose(LOWER).unwrap() as char;
+            let digit = *g.choose(DIGITS).unwrap() as char;
+            let special = *g.choose(SPECIAL).unwrap() as char;
+            let extra: String = (0..4)
+                .map(|_| *g.choose(LOWER).unwrap() as char)
+                .collect();
+
+            Self(format!("{upper}{lower}{digit}{special}{extra}"))
         }
     }
 
-    #[tokio::test]
     #[quickcheck_macros::quickcheck]
-    async fn valid_passwords_are_parsed_successfully(valid_password: ValidPasswordFixture) -> bool {
-        HashedPassword::parse(valid_password.0).await.is_ok()
+    fn valid_passwords_are_parsed_successfully(valid_password: ValidPasswordFixture) -> bool {
+        tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(HashedPassword::parse(valid_password.0))
+            .is_ok()
     }
 }
