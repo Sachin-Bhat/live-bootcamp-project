@@ -1,6 +1,5 @@
 use auth_service::{
     ErrorResponse,
-    domain::{Email, Password},
     routes::{SignupRequest, SignupResponse},
 };
 
@@ -8,18 +7,17 @@ use crate::helpers::{TestApp, get_random_email};
 
 #[tokio::test]
 async fn should_return_422_if_malformed_input() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
-    let _random_email = get_random_email(); // Call helper method to generate email
+    let _random_email = get_random_email();
 
-    // add more malformed input test cases
     let test_cases = [serde_json::json!({
         "password": "password123",
         "requires2FA": true
     })];
 
     for test_case in test_cases.iter() {
-        let response = app.post_signup(test_case).await; // call `post_signup`
+        let response = app.post_signup(test_case).await;
         assert_eq!(
             response.status().as_u16(),
             422,
@@ -27,21 +25,23 @@ async fn should_return_422_if_malformed_input() {
             test_case
         );
     }
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_201_if_valid_input() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
-    let random_email = get_random_email(); // Call helper method to generate email
+    let random_email = get_random_email();
 
     let test_case = SignupRequest {
-        email: Email::parse(random_email).expect("valid email"),
-        password: Password::parse("Password123!").expect("valid password"),
+        email: random_email,
+        password: "Password123!".to_owned(),
         requires_2fa: false,
     };
 
-    let response = app.post_signup(&test_case).await; // call `post_signup`
+    let response = app.post_signup(&test_case).await;
 
     assert_eq!(response.status().as_u16(), 201);
 
@@ -49,7 +49,6 @@ async fn should_return_201_if_valid_input() {
         message: "User created successfully!".to_owned(),
     };
 
-    // Assert that we are getting the correct response body!
     assert_eq!(
         response
             .json::<SignupResponse>()
@@ -57,18 +56,14 @@ async fn should_return_201_if_valid_input() {
             .expect("Could not deserialize response body to UserBody"),
         expected_response
     );
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_400_if_invalid_input() {
-    // The signup route should return a 400 HTTP status code if an invalid input is sent.
-    // The input is considered invalid if:
-    // - The email is empty or does not contain '@' or '.'
-    // - The password does not meet the required complexity rules
+    let mut app = TestApp::new().await;
 
-    // Create an array of invalid inputs. Then, iterate through the array and
-    // make HTTP calls to the signup route. Assert a 400 HTTP status code is returned.
-    let app = TestApp::new().await;
     let input = [
         serde_json::json!({
             "email": "",
@@ -100,17 +95,18 @@ async fn should_return_400_if_invalid_input() {
             "Invalid credentials".to_owned()
         );
     }
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_409_if_email_already_exists() {
-    // Call the signup route twice. The second request should fail with a 409 HTTP status code
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let response = app
         .post_signup(&SignupRequest {
-            email: Email::parse("test@example.com".to_owned()).expect("valid email"),
-            password: Password::parse("Password123!").expect("valid password"),
+            email: "test@example.com".to_owned(),
+            password: "Password123!".to_owned(),
             requires_2fa: false,
         })
         .await;
@@ -119,8 +115,8 @@ async fn should_return_409_if_email_already_exists() {
 
     let response = app
         .post_signup(&SignupRequest {
-            email: Email::parse("test@example.com".to_owned()).expect("valid email"),
-            password: Password::parse("Password123!").expect("valid password"),
+            email: "test@example.com".to_owned(),
+            password: "Password123!".to_owned(),
             requires_2fa: false,
         })
         .await;
@@ -135,4 +131,6 @@ async fn should_return_409_if_email_already_exists() {
             .error,
         "User already exists".to_owned()
     );
+
+    app.clean_up().await;
 }

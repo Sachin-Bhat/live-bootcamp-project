@@ -93,7 +93,9 @@ mod tests {
         store.add_user(user).await.unwrap();
 
         assert_eq!(
-            store.validate_user("test@example.com", "Password123!").await,
+            store
+                .validate_user("test@example.com", "Password123!")
+                .await,
             Ok(())
         );
         assert_eq!(

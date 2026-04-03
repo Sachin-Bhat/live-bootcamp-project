@@ -5,7 +5,7 @@ use crate::helpers::{TestApp, get_random_email};
 
 #[tokio::test]
 async fn should_return_400_if_jwt_cookie_missing() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
     let response = app
         .http_client
@@ -18,13 +18,14 @@ async fn should_return_400_if_jwt_cookie_missing() {
 
     let body: ErrorResponse = response.json().await.expect("valid error response");
     assert_eq!(body.error, "Missing token");
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_401_if_invalid_token() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
-    // add invalid cookie
     app.cookie_jar.add_cookie_str(
         &format!(
             "{}=invalid; HttpOnly; SameSite=Lax; Secure; Path=/",
@@ -39,13 +40,14 @@ async fn should_return_401_if_invalid_token() {
 
     let body: ErrorResponse = response.json().await.expect("valid error response");
     assert_eq!(body.error, "Invalid token");
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_200_if_valid_jwt_cookie() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
-    // create new user and get jwt cookie
     let email = get_random_email();
     let password = "Password123!";
     let signup_payload = serde_json::json!({
@@ -69,7 +71,6 @@ async fn should_return_200_if_valid_jwt_cookie() {
         .value()
         .to_owned();
 
-    // logout
     let response = app.post_logout(&token).await;
     assert_eq!(response.status().as_u16(), 200);
     let set_cookie_header = response
@@ -87,13 +88,15 @@ async fn should_return_200_if_valid_jwt_cookie() {
         Ok(true),
         "token should be added to banned token store after logout"
     );
+    drop(banned_token_store);
+
+    app.clean_up().await;
 }
 
 #[tokio::test]
 async fn should_return_400_if_logout_called_twice_in_a_row() {
-    let app = TestApp::new().await;
+    let mut app = TestApp::new().await;
 
-    // create new user and get jwt cookie
     let email = get_random_email();
     let password = "Password123!";
     let signup_payload = serde_json::json!({
@@ -111,7 +114,6 @@ async fn should_return_400_if_logout_called_twice_in_a_row() {
     let response = app.post_login(&login_payload).await;
     assert_eq!(response.status().as_u16(), 200);
 
-    // logout via cookie jar (no manual Cookie header) so the server-cleared cookie is honored
     let response = app
         .http_client
         .post(format!("{}/logout", app.address))
@@ -129,4 +131,6 @@ async fn should_return_400_if_logout_called_twice_in_a_row() {
     assert_eq!(response.status().as_u16(), 400);
     let body: ErrorResponse = response.json().await.expect("valid error response");
     assert_eq!(body.error, "Missing token");
+
+    app.clean_up().await;
 }
