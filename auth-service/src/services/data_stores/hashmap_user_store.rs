@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::domain::{User, UserStore, UserStoreError};
+use secrecy::{ExposeSecret, SecretString};
+
+use crate::domain::{Email, User, UserStore, UserStoreError};
 
 #[derive(Default)]
 pub struct HashmapUserStore {
@@ -10,22 +12,27 @@ pub struct HashmapUserStore {
 #[async_trait::async_trait]
 impl UserStore for HashmapUserStore {
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError> {
-        if self.users.contains_key(user.email.as_ref()) {
-            Err(UserStoreError::UserAlreadyExists)
-        } else {
-            self.users.insert(user.email.as_ref().to_owned(), user);
+        let key = user.email.as_ref().expose_secret().to_owned();
+        if let std::collections::hash_map::Entry::Vacant(e) = self.users.entry(key) {
+            e.insert(user);
             Ok(())
+        } else {
+            Err(UserStoreError::UserAlreadyExists)
         }
     }
 
-    async fn get_user(&self, email: &str) -> Result<User, UserStoreError> {
+    async fn get_user(&self, email: &Email) -> Result<User, UserStoreError> {
         self.users
-            .get(email)
+            .get(email.as_ref().expose_secret())
             .cloned()
             .ok_or(UserStoreError::UserNotFound)
     }
 
-    async fn validate_user(&self, email: &str, raw_password: &str) -> Result<(), UserStoreError> {
+    async fn validate_user(
+        &self,
+        email: &Email,
+        raw_password: &SecretString,
+    ) -> Result<(), UserStoreError> {
         let user = self.get_user(email).await?;
         user.password
             .verify_raw_password(raw_password)
@@ -39,12 +46,20 @@ mod tests {
     use super::*;
     use crate::domain::{Email, HashedPassword};
 
+    fn make_email(s: &str) -> Email {
+        Email::parse(SecretString::new(s.to_owned().into_boxed_str())).expect("valid email")
+    }
+
+    fn make_password(s: &str) -> SecretString {
+        SecretString::new(s.to_owned().into_boxed_str())
+    }
+
     #[tokio::test]
     async fn test_add_user() {
         let mut store = HashmapUserStore::default();
         let user = User::new(
-            Email::parse("test@example.com".to_owned()).expect("valid email"),
-            HashedPassword::parse("Password123!".to_owned())
+            make_email("test@example.com"),
+            HashedPassword::parse(make_password("Password123!"))
                 .await
                 .expect("valid password"),
             false,
@@ -60,9 +75,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_user() {
         let mut store = HashmapUserStore::default();
+        let email = make_email("test@example.com");
         let user = User::new(
-            Email::parse("test@example.com".to_owned()).expect("valid email"),
-            HashedPassword::parse("Password123!".to_owned())
+            email.clone(),
+            HashedPassword::parse(make_password("Password123!"))
                 .await
                 .expect("valid password"),
             false,
@@ -70,11 +86,14 @@ mod tests {
 
         store.add_user(user).await.unwrap();
 
-        let found = store.get_user("test@example.com").await.unwrap();
-        assert_eq!(found.email.as_ref(), "test@example.com");
-        assert!(found.password.verify_raw_password("Password123!").await.is_ok());
+        let found = store.get_user(&email).await.unwrap();
+        assert_eq!(
+            found.email.as_ref().expose_secret(),
+            "test@example.com"
+        );
+        assert!(found.password.verify_raw_password(&make_password("Password123!")).await.is_ok());
         assert!(matches!(
-            store.get_user("missing@example.com").await,
+            store.get_user(&make_email("missing@example.com")).await,
             Err(UserStoreError::UserNotFound)
         ));
     }
@@ -82,9 +101,10 @@ mod tests {
     #[tokio::test]
     async fn test_validate_user() {
         let mut store = HashmapUserStore::default();
+        let email = make_email("test@example.com");
         let user = User::new(
-            Email::parse("test@example.com".to_owned()).expect("valid email"),
-            HashedPassword::parse("Password123!".to_owned())
+            email.clone(),
+            HashedPassword::parse(make_password("Password123!"))
                 .await
                 .expect("valid password"),
             false,
@@ -93,20 +113,16 @@ mod tests {
         store.add_user(user).await.unwrap();
 
         assert_eq!(
-            store
-                .validate_user("test@example.com", "Password123!")
-                .await,
+            store.validate_user(&email, &make_password("Password123!")).await,
             Ok(())
         );
         assert_eq!(
-            store
-                .validate_user("test@example.com", "wrong-password")
-                .await,
+            store.validate_user(&email, &make_password("wrong-password")).await,
             Err(UserStoreError::InvalidCredentials)
         );
         assert_eq!(
             store
-                .validate_user("missing@example.com", "password123")
+                .validate_user(&make_email("missing@example.com"), &make_password("password123"))
                 .await,
             Err(UserStoreError::UserNotFound)
         );

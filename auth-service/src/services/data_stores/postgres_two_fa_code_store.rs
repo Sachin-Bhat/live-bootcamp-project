@@ -1,3 +1,5 @@
+use color_eyre::eyre::eyre;
+use secrecy::ExposeSecret;
 use sqlx::PgPool;
 
 use crate::domain::{
@@ -18,6 +20,7 @@ impl PostgresTwoFACodeStore {
 
 #[async_trait::async_trait]
 impl TwoFACodeStore for PostgresTwoFACodeStore {
+    #[tracing::instrument(name = "Adding 2FA code to PostgreSQL", skip_all)]
     async fn add_code(
         &mut self,
         email: Email,
@@ -26,7 +29,7 @@ impl TwoFACodeStore for PostgresTwoFACodeStore {
     ) -> Result<(), TwoFACodeStoreError> {
         let expires_at = chrono::Utc::now()
             + chrono::Duration::try_seconds(TEN_MINUTES_IN_SECONDS)
-                .ok_or(TwoFACodeStoreError::UnexpectedError)?;
+                .ok_or_else(|| TwoFACodeStoreError::UnexpectedError(eyre!("Failed to create duration")))?;
 
         sqlx::query!(
             r#"
@@ -37,46 +40,48 @@ impl TwoFACodeStore for PostgresTwoFACodeStore {
                     code = EXCLUDED.code,
                     expires_at = EXCLUDED.expires_at
             "#,
-            email.as_ref(),
-            login_attempt_id.as_ref(),
-            code.as_ref(),
+            email.as_ref().expose_secret(),
+            login_attempt_id.as_ref().expose_secret(),
+            code.as_ref().expose_secret(),
             expires_at,
         )
         .execute(&self.pool)
         .await
-        .map_err(|_| TwoFACodeStoreError::UnexpectedError)?;
+        .map_err(|e| TwoFACodeStoreError::UnexpectedError(e.into()))?;
 
         Ok(())
     }
 
+    #[tracing::instrument(name = "Removing 2FA code from PostgreSQL", skip_all)]
     async fn remove_code(&mut self, email: &Email) -> Result<(), TwoFACodeStoreError> {
         sqlx::query!(
             "DELETE FROM two_fa_codes WHERE email = $1",
-            email.as_ref(),
+            email.as_ref().expose_secret(),
         )
         .execute(&self.pool)
         .await
-        .map_err(|_| TwoFACodeStoreError::UnexpectedError)?;
+        .map_err(|e| TwoFACodeStoreError::UnexpectedError(e.into()))?;
 
         Ok(())
     }
 
+    #[tracing::instrument(name = "Retrieving 2FA code from PostgreSQL", skip_all)]
     async fn get_code(
         &self,
         email: &Email,
     ) -> Result<(LoginAttemptId, TwoFACode), TwoFACodeStoreError> {
         let row = sqlx::query!(
             "SELECT login_attempt_id, code FROM two_fa_codes WHERE email = $1 AND expires_at > NOW()",
-            email.as_ref(),
+            email.as_ref().expose_secret(),
         )
         .fetch_one(&self.pool)
         .await
         .map_err(|_| TwoFACodeStoreError::LoginAttemptIdNotFound)?;
 
         let login_attempt_id = LoginAttemptId::parse(row.login_attempt_id)
-            .map_err(|_| TwoFACodeStoreError::UnexpectedError)?;
+            .map_err(TwoFACodeStoreError::UnexpectedError)?;
         let code = TwoFACode::parse(row.code)
-            .map_err(|_| TwoFACodeStoreError::UnexpectedError)?;
+            .map_err(TwoFACodeStoreError::UnexpectedError)?;
 
         Ok((login_attempt_id, code))
     }

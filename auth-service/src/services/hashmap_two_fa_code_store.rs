@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use secrecy::ExposeSecret;
+
 use crate::domain::{Email, LoginAttemptId, TwoFACode, TwoFACodeStore, TwoFACodeStoreError};
 
 #[derive(Default)]
@@ -16,12 +18,12 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
         code: TwoFACode,
     ) -> Result<(), TwoFACodeStoreError> {
         self.codes
-            .insert(email.as_ref().to_owned(), (login_attempt_id, code));
+            .insert(email.as_ref().expose_secret().to_owned(), (login_attempt_id, code));
         Ok(())
     }
 
     async fn remove_code(&mut self, email: &Email) -> Result<(), TwoFACodeStoreError> {
-        self.codes.remove(email.as_ref());
+        self.codes.remove(email.as_ref().expose_secret());
         Ok(())
     }
 
@@ -30,7 +32,7 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
         email: &Email,
     ) -> Result<(LoginAttemptId, TwoFACode), TwoFACodeStoreError> {
         self.codes
-            .get(email.as_ref())
+            .get(email.as_ref().expose_secret())
             .cloned()
             .ok_or(TwoFACodeStoreError::LoginAttemptIdNotFound)
     }
@@ -38,14 +40,20 @@ impl TwoFACodeStore for HashmapTwoFACodeStore {
 
 #[cfg(test)]
 mod tests {
+    use secrecy::SecretString;
+
     use crate::domain::{Email, LoginAttemptId, TwoFACode, TwoFACodeStore};
 
     use super::HashmapTwoFACodeStore;
 
+    fn make_email(s: &str) -> Email {
+        Email::parse(SecretString::new(s.to_owned().into_boxed_str())).expect("valid email")
+    }
+
     #[tokio::test]
     async fn add_code_stores_code() {
         let mut store = HashmapTwoFACodeStore::default();
-        let email = Email::parse("test@example.com".to_owned()).expect("valid email");
+        let email = make_email("test@example.com");
         let attempt = LoginAttemptId::default();
         let code = TwoFACode::default();
 
@@ -63,7 +71,7 @@ mod tests {
     #[tokio::test]
     async fn remove_code_deletes_existing_code() {
         let mut store = HashmapTwoFACodeStore::default();
-        let email = Email::parse("test@example.com".to_owned()).expect("valid email");
+        let email = make_email("test@example.com");
 
         store
             .add_code(
@@ -84,7 +92,7 @@ mod tests {
     #[tokio::test]
     async fn get_code_returns_error_if_missing() {
         let store = HashmapTwoFACodeStore::default();
-        let email = Email::parse("missing@example.com".to_owned()).expect("valid email");
+        let email = make_email("missing@example.com");
 
         let result = store.get_code(&email).await;
         assert!(matches!(

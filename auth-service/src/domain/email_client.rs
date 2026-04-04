@@ -1,3 +1,5 @@
+use color_eyre::eyre::Result;
+
 use super::Email;
 
 // This trait represents the interface all concrete email clients should implement
@@ -8,5 +10,5 @@ pub trait EmailClient {
         recipient: &Email,
         subject: &str,
         content: &str,
-    ) -> Result<(), String>;
+    ) -> Result<()>;
 }

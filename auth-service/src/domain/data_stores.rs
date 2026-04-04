@@ -1,24 +1,28 @@
+use color_eyre::eyre::{Context, Report, Result, bail};
 use rand::RngExt;
+use secrecy::{ExposeSecret, SecretString};
+use thiserror::Error;
 use uuid::Uuid;
 
 use super::{Email, User};
 
 #[async_trait::async_trait]
 pub trait UserStore {
-    // Add the `add_user`, `get_user`, and `validate_user` methods.
-    // Make sure all methods are async so we can use async user stores in the future
     async fn add_user(&mut self, user: User) -> Result<(), UserStoreError>;
-    async fn get_user(&self, email: &str) -> Result<User, UserStoreError>;
-    async fn validate_user(&self, email: &str, raw_password: &str) -> Result<(), UserStoreError>;
+    async fn get_user(&self, email: &Email) -> Result<User, UserStoreError>;
+    async fn validate_user(
+        &self,
+        email: &Email,
+        raw_password: &SecretString,
+    ) -> Result<(), UserStoreError>;
 }
 
 #[async_trait::async_trait]
 pub trait BannedTokenStore {
-    async fn add_token(&mut self, token: String) -> Result<(), BannedTokenStoreError>;
-    async fn contains_token(&self, token: &str) -> Result<bool, BannedTokenStoreError>;
+    async fn add_token(&mut self, token: SecretString) -> Result<(), BannedTokenStoreError>;
+    async fn contains_token(&self, token: &SecretString) -> Result<bool, BannedTokenStoreError>;
 }
 
-// This trait represents the interface all concrete 2FA code stores should implement
 #[async_trait::async_trait]
 pub trait TwoFACodeStore {
     async fn add_code(
@@ -34,57 +38,102 @@ pub trait TwoFACodeStore {
     ) -> Result<(LoginAttemptId, TwoFACode), TwoFACodeStoreError>;
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Error)]
 pub enum UserStoreError {
+    #[error("User already exists")]
     UserAlreadyExists,
+    #[error("User not found")]
     UserNotFound,
+    #[error("Invalid credentials")]
     InvalidCredentials,
-    UnexpectedError,
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
 }
 
-#[derive(Debug, PartialEq)]
+impl PartialEq for UserStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::UserAlreadyExists, Self::UserAlreadyExists)
+                | (Self::UserNotFound, Self::UserNotFound)
+                | (Self::InvalidCredentials, Self::InvalidCredentials)
+                | (Self::UnexpectedError(_), Self::UnexpectedError(_))
+        )
+    }
+}
+
+#[derive(Debug, Error)]
 pub enum BannedTokenStoreError {
-    UnexpectedError,
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
 }
 
-#[derive(Debug, PartialEq)]
+impl PartialEq for BannedTokenStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::UnexpectedError(_), Self::UnexpectedError(_))
+        )
+    }
+}
+
+#[derive(Debug, Error)]
 pub enum TwoFACodeStoreError {
+    #[error("Login attempt ID not found")]
     LoginAttemptIdNotFound,
-    UnexpectedError,
+    #[error("Unexpected error")]
+    UnexpectedError(#[source] Report),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct LoginAttemptId(String);
+impl PartialEq for TwoFACodeStoreError {
+    fn eq(&self, other: &Self) -> bool {
+        matches!(
+            (self, other),
+            (Self::LoginAttemptIdNotFound, Self::LoginAttemptIdNotFound)
+                | (Self::UnexpectedError(_), Self::UnexpectedError(_))
+        )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LoginAttemptId(SecretString);
 
 impl LoginAttemptId {
-    pub fn parse(id: String) -> Result<Self, String> {
-        Uuid::parse_str(&id)
-            .map(|_| Self(id))
-            .map_err(|_| "Invalid login attempt ID".to_owned())
+    pub fn parse(id: String) -> Result<Self> {
+        Uuid::parse_str(&id).wrap_err("Invalid login attempt ID")?;
+        Ok(Self(SecretString::new(id.into_boxed_str())))
     }
 }
 
 impl Default for LoginAttemptId {
     fn default() -> Self {
-        Self(Uuid::new_v4().to_string())
+        Self(SecretString::new(
+            Uuid::new_v4().to_string().into_boxed_str(),
+        ))
     }
 }
 
-impl AsRef<str> for LoginAttemptId {
-    fn as_ref(&self) -> &str {
+impl AsRef<SecretString> for LoginAttemptId {
+    fn as_ref(&self) -> &SecretString {
         &self.0
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TwoFACode(String);
+impl PartialEq for LoginAttemptId {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TwoFACode(SecretString);
 
 impl TwoFACode {
-    pub fn parse(code: String) -> Result<Self, String> {
+    pub fn parse(code: String) -> Result<Self> {
         if code.len() == 6 && code.chars().all(|c| c.is_ascii_digit()) {
-            Ok(Self(code))
+            Ok(Self(SecretString::new(code.into_boxed_str())))
         } else {
-            Err("2FA code must be a 6-digit number".to_owned())
+            bail!("2FA code must be a 6-digit number");
         }
     }
 }
@@ -92,13 +141,21 @@ impl TwoFACode {
 impl Default for TwoFACode {
     fn default() -> Self {
         let mut rng = rand::rng();
-        let code: u32 = rng.random_range(0..1_000_000);
-        Self(format!("{code:06}"))
+        let code: u32 = rng.random_range(100_000..=999_999);
+        Self(SecretString::new(
+            format!("{code:06}").into_boxed_str(),
+        ))
     }
 }
 
-impl AsRef<str> for TwoFACode {
-    fn as_ref(&self) -> &str {
+impl AsRef<SecretString> for TwoFACode {
+    fn as_ref(&self) -> &SecretString {
         &self.0
+    }
+}
+
+impl PartialEq for TwoFACode {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.expose_secret() == other.0.expose_secret()
     }
 }

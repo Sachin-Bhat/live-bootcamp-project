@@ -1,4 +1,5 @@
 use auth_service::{ErrorResponse, utils::constants::JWT_COOKIE_NAME};
+use secrecy::SecretString;
 
 use crate::helpers::{TestApp, get_random_email};
 
@@ -117,7 +118,7 @@ async fn should_return_401_if_banned_token() {
 
     let mut banned_token_store = app.banned_token_store.write().await;
     banned_token_store
-        .add_token(token.clone())
+        .add_token(SecretString::new(token.clone().into_boxed_str()))
         .await
         .expect("token should be insertable into banned token store");
     drop(banned_token_store);
