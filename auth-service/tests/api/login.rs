@@ -4,6 +4,8 @@ use auth_service::{
     routes::TwoFactorAuthResponse,
     utils::constants::JWT_COOKIE_NAME,
 };
+use secrecy::{ExposeSecret, SecretString};
+use wiremock::{Mock, ResponseTemplate, matchers::{method, path}};
 
 use crate::helpers::{TestApp, get_random_email};
 
@@ -11,9 +13,10 @@ use crate::helpers::{TestApp, get_random_email};
 async fn should_return_422_if_malformed_credentials() {
     let mut app = TestApp::new().await;
 
-    let test_cases = [serde_json::json!({
-        "password": "password123"
-    })];
+    let test_cases = [
+        serde_json::json!({ "password": "password123" }),
+        serde_json::json!({ "email": get_random_email() }),
+    ];
 
     for test_case in test_cases.iter() {
         let response = app.post_login(test_case).await;
@@ -32,7 +35,6 @@ async fn should_return_422_if_malformed_credentials() {
 async fn should_return_400_if_invalid_input() {
     let mut app = TestApp::new().await;
 
-    let email = get_random_email();
     let password = "password123";
 
     let invalid_email_payload = serde_json::json!({
@@ -45,17 +47,6 @@ async fn should_return_400_if_invalid_input() {
         response.status().as_u16(),
         400,
         "Expected 400 for invalid email format"
-    );
-
-    let missing_password_payload = serde_json::json!({
-        "email": email
-    });
-
-    let response = app.post_login(&missing_password_payload).await;
-    assert_eq!(
-        response.status().as_u16(),
-        400,
-        "Expected 400 for missing password"
     );
 
     app.clean_up().await;
@@ -143,6 +134,13 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
     let response = app.post_signup(&signup_body).await;
     assert_eq!(response.status().as_u16(), 201);
 
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
     let login_body = serde_json::json!({
         "email": random_email,
         "password": "Password123!",
@@ -166,12 +164,16 @@ async fn should_return_206_if_valid_credentials_and_2fa_enabled() {
 
     assert_eq!(json_body.message, "2FA required".to_owned());
 
-    let email = Email::parse(random_email).expect("email should parse");
+    let email = Email::parse(SecretString::new(random_email.into_boxed_str()))
+        .expect("email should parse");
     let two_fa_code_store = app.two_fa_code_store.read().await;
     let (stored_login_attempt_id, _) = TwoFACodeStore::get_code(&**two_fa_code_store, &email)
         .await
         .expect("2FA code entry should exist");
-    assert_eq!(stored_login_attempt_id.as_ref(), json_body.login_attempt_id);
+    assert_eq!(
+        stored_login_attempt_id.as_ref().expose_secret(),
+        &json_body.login_attempt_id
+    );
 
     drop(two_fa_code_store);
     app.clean_up().await;

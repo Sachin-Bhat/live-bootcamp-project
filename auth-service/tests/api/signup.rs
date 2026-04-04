@@ -1,6 +1,6 @@
 use auth_service::{
     ErrorResponse,
-    routes::{SignupRequest, SignupResponse},
+    routes::SignupResponse,
 };
 
 use crate::helpers::{TestApp, get_random_email};
@@ -35,11 +35,11 @@ async fn should_return_201_if_valid_input() {
 
     let random_email = get_random_email();
 
-    let test_case = SignupRequest {
-        email: random_email,
-        password: "Password123!".to_owned(),
-        requires_2fa: false,
-    };
+    let test_case = serde_json::json!({
+        "email": random_email,
+        "password": "Password123!",
+        "requires2FA": false
+    });
 
     let response = app.post_signup(&test_case).await;
 
@@ -103,24 +103,16 @@ async fn should_return_400_if_invalid_input() {
 async fn should_return_409_if_email_already_exists() {
     let mut app = TestApp::new().await;
 
-    let response = app
-        .post_signup(&SignupRequest {
-            email: "test@example.com".to_owned(),
-            password: "Password123!".to_owned(),
-            requires_2fa: false,
-        })
-        .await;
+    let payload = serde_json::json!({
+        "email": "test@example.com",
+        "password": "Password123!",
+        "requires2FA": false
+    });
 
+    let response = app.post_signup(&payload).await;
     assert_eq!(response.status().as_u16(), 201);
 
-    let response = app
-        .post_signup(&SignupRequest {
-            email: "test@example.com".to_owned(),
-            password: "Password123!".to_owned(),
-            requires_2fa: false,
-        })
-        .await;
-
+    let response = app.post_signup(&payload).await;
     assert_eq!(response.status().as_u16(), 409);
 
     assert_eq!(

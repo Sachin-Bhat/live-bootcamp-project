@@ -1,5 +1,6 @@
 use auth_service::{ErrorResponse, utils::constants::JWT_COOKIE_NAME};
 use reqwest::Url;
+use secrecy::SecretString;
 
 use crate::helpers::{TestApp, get_random_email};
 
@@ -83,8 +84,9 @@ async fn should_return_200_if_valid_jwt_cookie() {
     assert!(set_cookie_header.contains("Max-Age=0"));
 
     let banned_token_store = app.banned_token_store.read().await;
+    let secret_token = SecretString::new(token.clone().into_boxed_str());
     assert_eq!(
-        banned_token_store.contains_token(&token).await,
+        banned_token_store.contains_token(&secret_token).await,
         Ok(true),
         "token should be added to banned token store after logout"
     );
